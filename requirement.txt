@@ -1,0 +1,6 @@
+pyserial
+pynmeagps
+aprs3
+kiss3
+ax253
+zulu
