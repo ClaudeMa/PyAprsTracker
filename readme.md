@@ -4,7 +4,7 @@ The tracker uses either a TNC modem in KISS mode or a KISS TCP connection (Direw
 
 **Installation**
 
-Install the python3-venv and pip modules for your distribution, e.g. Debian and derivatives.
+Install the python3 venv and pip modules for your distribution, e.g. for Debian and derivatives.
 
 sudo apt install python3.venv python3-pip
 
