@@ -17,9 +17,9 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
-
+import os
 import sys
-from datetime import date
+from datetime import date, datetime
 from sys import argv
 import time
 from serial import Serial
@@ -29,6 +29,7 @@ from aprs import geo_util
 import kiss
 import logging
 import zulu
+import timesetter
 
 import constants
 import config
@@ -56,6 +57,18 @@ def aprstime():
     dt = zulu.now()
     return bytes(dt.format('ddHHmm').strip() + "z", 'utf-8')
 
+
+def setsystemtimefromgps(mdate, mtime):
+    gpstime = datetime(year=mdate.year,
+                       month=mdate.month,
+                       day=mdate.day,
+                       hour=mtime.hour,
+                       minute=mtime.minute,
+                       second=mtime.second)
+    systemdate = zulu.now()
+    if systemdate.timestamp() < gpstime.timestamp():
+        logger.info("System  date set to {str(gpstime)}")
+        os.system('sudo date -–set=”%s”' % gpstime)
 
 def init_logging():
     global logger
@@ -168,23 +181,24 @@ def main(**kwargs):
         else:
             logger.critical(f'ERROR: Unknow KISS mode', config.kiss['mode'])
             sys.exit(1)
-    except Exception as e:
-        logging.critical(e)
-        sys.exit(1)
-    ki.start(TX_DELAY=config.kissconfig['TX_DELAY'],
+        ki.start(TX_DELAY=config.kissconfig['TX_DELAY'],
              PERSISTENCE=config.kissconfig['PERSISTENCE'],
              SLOT_TIME=config.kissconfig['SLOT_TIME'],
              TX_TAIL=config.kissconfig['TX_TAIL'],
              FULL_DUPLEX=config.kissconfig['FULL_DUPLEX'])
-
-    if config.kiss['mode'] == 'KISS_SERIAL' and config.kiss['kisson']:
-        logger.info('KISS ON')
-        ki.kiss_on()
+        if config.kiss['mode'] == 'KISS_SERIAL' and config.kiss['kisson']:
+            logger.info('KISS ON')
+            ki.kiss_on()
+    except Exception as e:
+        logging.critical(e)
+        logging.critical("KISS connect call failed.Is your KISS modem started?")
+        sys.exit(1)
     count = 0
     try:
         gps_port = config.gps['device']
         gps_baudrate = config.gps['baudrate']
         gps_timeout = float(config.gps['timeout'])
+        timeisset = False
         try:
             with Serial(port=gps_port, baudrate=gps_baudrate, timeout=gps_timeout) as stream:
                 nmr = NMEAReader(
@@ -197,7 +211,8 @@ def main(**kwargs):
                     if msg.msgID == "GSA":
                         if msg.navMode == 1:
                             gps_fix = False
-                            logger.info("no fix")
+                            logger.info("GPS has no fix")
+                            print("GPS has no fix")
                         else:
                             gps_fix = True
                     if msg.msgID == "GGA" and gps_fix:
@@ -218,6 +233,11 @@ def main(**kwargs):
                             sys.exit(1)
                         logger.info(f"postion : {geo_util.dec2dm_lat(latitude)} - {geo_util.dec2dm_lng(longitude)}")
                     if msg.msgID == "RMC" and gps_fix:
+                        print(msg.time)
+                        print(msg.date)
+                        if config.setsystemtime and timeisset == False:
+                            setsystemtimefromgps(msg.date, msg.time)
+                            timeisset = True
                         if msg.spd:
                             speed = float(msg.spd) * 1.852
                             logger.info(f"Speed : {speed:10.2f} km/h")
@@ -239,6 +259,10 @@ def main(**kwargs):
         if config.kiss['mode'] == 'KISS_SERIAL' and config.kiss['kisson']:
             logger.info('KISS OFF')
             ki.kiss_off()
+        if count == 0:
+            print("No messages read from GPS. Check connections")
+            logger.debug("No messages read from GPS")
+            exit(1)
         logger.info(f"\n{count} messages read.\n")
 
 
