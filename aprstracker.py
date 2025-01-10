@@ -67,7 +67,7 @@ def setsystemtimefromgps(mdate, mtime):
                        second=mtime.second)
     systemdate = zulu.now()
     if systemdate.timestamp() < gpstime.timestamp():
-        logger.info("System  date set to {str(gpstime)}")
+        logger.info(f"System date set to {str(gpstime)}")
         os.system('sudo date -–set=”%s”' % gpstime)
 
 def init_logging():
@@ -136,13 +136,13 @@ def smartbeacon_decision(speed_kmh, turn_angle):
     # Corner pegging - if not stopped
     if speed_kmh > 0:
         turn_threshold = rate['SB_TURN_MIN_ANGLE'] + rate['SB_TURN_SLOPE'] / speed_kmh  # turn threshold speed-dependent
-        logger.info(f"turn_threshold : {turn_threshold:10.2f}°")
+        logger.info(f"turn_threshold : {turn_threshold:10.2f}")
         if turn_angle > turn_threshold and secs_since_beacon > rate['SB_TURN_TIME']:
             logging.info("SmartBeacon: Requesting transmit (due to turn)")
-            return True  # transmit beacon now
+            return True
     if secs_since_beacon > beacon_rate:
         logger.info("SmartBeacon: Requesting transmit")
-        return True  # send beacon and loop
+        return True
     return False
 
 
@@ -179,7 +179,7 @@ def main(**kwargs):
             ki = kiss.SerialKISS(port=port, speed=speed)
 
         else:
-            logger.critical(f'ERROR: Unknow KISS mode', config.kiss['mode'])
+            logger.critical(f"ERROR: Unknow KISS mode {config.kiss['mode']}")
             sys.exit(1)
         ki.start(TX_DELAY=config.kissconfig['TX_DELAY'],
              PERSISTENCE=config.kissconfig['PERSISTENCE'],
@@ -231,10 +231,8 @@ def main(**kwargs):
                             logger.critical(f"Cannot convert float from {longitude}")
                             logger.critical(f"Message  {msg}")
                             sys.exit(1)
-                        logger.info(f"postion : {geo_util.dec2dm_lat(latitude)} - {geo_util.dec2dm_lng(longitude)}")
+                        logger.info(f"position : {geo_util.dec2dm_lat(latitude)} - {geo_util.dec2dm_lng(longitude)}")
                     if msg.msgID == "RMC" and gps_fix:
-                        print(msg.time)
-                        print(msg.date)
                         if config.setsystemtime and timeisset == False:
                             setsystemtimefromgps(msg.date, msg.time)
                             timeisset = True
